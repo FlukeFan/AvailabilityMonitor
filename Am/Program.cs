@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -14,6 +16,7 @@ namespace Am
     class Program
     {
         private static Logger _logger;
+        private static HttpClient _httpClient;
 
         static void Main(string[] args)
         {
@@ -69,26 +72,29 @@ namespace Am
 
         private static void Run(string[] args)
         {
-            if (args.Length < 1)
-                throw new Exception($"Usage: Am.exe <url to monitor> (supplied args={string.Join(", ", args)})");
+            using (_httpClient = new HttpClient())
+            {
+                if (args.Length < 1)
+                    throw new Exception($"Usage: Am.exe <url to monitor> (supplied args={string.Join(", ", args)})");
 
-            var url = args[0];
-            var cts = new CancellationTokenSource();
+                var url = args[0];
+                var cts = new CancellationTokenSource();
 
-            var threads = new List<Thread>
+                var threads = new List<Thread>
             {
                 new Thread(() => MonitorAsync(1, cts.Token, url).GetAwaiter().GetResult()),
                 new Thread(() => MonitorAsync(2, cts.Token, url).GetAwaiter().GetResult()),
                 new Thread(() => MonitorAsync(3, cts.Token, url).GetAwaiter().GetResult()),
             };
 
-            threads.ForEach(t => t.Start());
+                threads.ForEach(t => t.Start());
 
-            _logger.Info("Press enter to stop ...");
-            Console.ReadLine();
+                _logger.Info("Press enter to stop ...");
+                Console.ReadLine();
 
-            cts.Cancel();
-            threads.ForEach(t => t.Join());
+                cts.Cancel();
+                threads.ForEach(t => t.Join());
+            }
         }
 
         private static async Task MonitorAsync(int id, CancellationToken cancellationToken, string url)
@@ -97,7 +103,11 @@ namespace Am
             {
                 while (true)
                 {
-                    await Task.Delay(1000);
+                    var response = await _httpClient.GetAsync(url);
+
+                    if (!response.IsSuccessStatusCode)
+                        _logger.Warn($"Monitor {id} response {response.StatusCode} ({(int)response.StatusCode})");
+
                     cancellationToken.ThrowIfCancellationRequested();
                 }
             }
