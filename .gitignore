@@ -1,0 +1,7 @@
+bin
+obj
+.vs
+.vscode
+.build
+*.user
+logs
