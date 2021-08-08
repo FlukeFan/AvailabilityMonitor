@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Am": {
+      "commandName": "Project",
+      "commandLineArgs": "https://www.google.com"
+    }
+  }
+}
