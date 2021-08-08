@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using NLog.Common;
@@ -13,7 +15,7 @@ namespace Am
     {
         private static Logger _logger;
 
-        static async Task Main(string[] args)
+        static void Main(string[] args)
         {
             var config = new LoggingConfiguration();
             var rootFolder = Directory.GetCurrentDirectory();
@@ -51,7 +53,7 @@ namespace Am
 
             try
             {
-                await RunAsync(args);
+                Run(args);
             }
             catch (Exception ex)
             {
@@ -65,14 +67,48 @@ namespace Am
             LogManager.Shutdown();
         }
 
-        private static async Task RunAsync(string[] args)
+        private static void Run(string[] args)
         {
             if (args.Length < 1)
                 throw new Exception($"Usage: Am.exe <url to monitor> (supplied args={string.Join(", ", args)})");
 
+            var url = args[0];
+            var cts = new CancellationTokenSource();
+
+            var threads = new List<Thread>
+            {
+                new Thread(() => MonitorAsync(1, cts.Token, url).GetAwaiter().GetResult()),
+                new Thread(() => MonitorAsync(2, cts.Token, url).GetAwaiter().GetResult()),
+                new Thread(() => MonitorAsync(3, cts.Token, url).GetAwaiter().GetResult()),
+            };
+
+            threads.ForEach(t => t.Start());
+
             _logger.Info("Press enter to stop ...");
             Console.ReadLine();
-            await Task.CompletedTask;
+
+            cts.Cancel();
+            threads.ForEach(t => t.Join());
+        }
+
+        private static async Task MonitorAsync(int id, CancellationToken cancellationToken, string url)
+        {
+            try
+            {
+                while (true)
+                {
+                    await Task.Delay(1000);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.Info($"Monitor {id} exit");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, $"Error in monitor {id}");
+            }
         }
     }
 }
