@@ -37,7 +37,13 @@ namespace Am
                 OverflowAction = BufferingTargetWrapperOverflowAction.Flush,
             };
 
-            config.AddRule(LogLevel.Trace, LogLevel.Fatal, wrapper);
+            var consoleTarget = new ConsoleTarget("console")
+            {
+                Layout = "${longdate}|${level:uppercase=true}|${logger}|${message} ${exception:format=tostring}",
+            };
+
+            config.AddRuleForAllLevels(wrapper);
+            config.AddRuleForAllLevels(consoleTarget);
             LogManager.Configuration = config;
 
             _logger = LogManager.GetLogger("am");
@@ -64,7 +70,7 @@ namespace Am
             if (args.Length < 1)
                 throw new Exception($"Usage: Am.exe <url to monitor> (supplied args={string.Join(", ", args)})");
 
-            Console.WriteLine("Press enter to stop ...");
+            _logger.Info("Press enter to stop ...");
             Console.ReadLine();
             await Task.CompletedTask;
         }
